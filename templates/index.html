@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Proof Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body class="bg-light">
+    <div class="container py-4">
+
+        <h2 class="text-center mb-4">📊 Proof Dashboard</h2>
+
+        <!-- Alerts -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div>
+            {% for category, message in messages %}
+            <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+                {{message}}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Task Form -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" class="row g-3">
+                    <div class="col-md-6"><input type="text" name="team" class="form-control" placeholder="Name"
+                            required></div>
+                    <div class="col-md-6"><input type="text" name="project" class="form-control" placeholder="Project"
+                            required></div>
+                    <div class="col-md-6">
+                        <select name="task_type" class="form-select" required>
+                            <option value="">Select Task Type</option>
+                            <option value="R&D">R&D</option>
+                            <option value="Figma">Figma</option>
+                            <option value="Code">Code</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6"><input type="text" name="description" class="form-control"
+                            placeholder="Description" required></div>
+
+                    <!-- Dynamic Links -->
+                    <div class="col-md-12">
+                        <label>Proof Links:</label>
+                        <div id="links-wrapper">
+                            <input type="text" name="links[]" class="form-control mb-2" placeholder="Add link">
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="add-link-btn">➕ Add Link</button>
+                    </div>
+
+                    <!-- Multiple Files -->
+                    <div class="col-md-12">
+                        <label>Upload Files:</label>
+                        <input type="file" name="files[]" multiple class="form-control">
+                    </div>
+
+                    <div class="col-12 text-center">
+                        <button type="submit" class="btn btn-success px-4">➕ Add Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="d-flex mb-3">
+            <form method="GET" class="d-flex gap-2">
+                <select name="team" class="form-select">
+                    <option>All</option>
+                    {% for t in teams %}
+                    <option value="{{t.team}}" {% if request.args.get('team')==t.team %}selected{% endif %}>{{t.team}}
+                    </option>
+                    {% endfor %}
+                </select>
+                <select name="project" class="form-select">
+                    <option>All</option>
+                    {% for p in projects %}
+                    <option value="{{p.project}}" {% if request.args.get('project')==p.project %}selected{% endif %}>
+                        {{p.project}}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-primary">Filter</button>
+            </form>
+        </div>
+
+        <!-- Tasks Table -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <table class="table table-hover table-striped align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Team</th>
+                            <th>Project</th>
+                            <th>Task Type</th>
+                            <th>Description</th>
+                            <th>Proof</th>
+                            <th>Files</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>{{task.team}}</td>
+                            <td>{{task.project}}</td>
+                            <td>{{task.task_type}}</td>
+                            <td>{{task.description}}</td>
+
+                            <!-- Proof Links -->
+                            <td>
+                                {% for link in task.links %}
+                                {% set idx = loop.index0 %}
+                                <div class="d-flex mb-1 align-items-center">
+                                    <a href="{{link}}" target="_blank" class="btn btn-info btn-sm me-2">🔗</a>
+                                    <a href="{{ url_for('delete_link', task_id=task.id, index=idx) }}"
+                                        class="btn btn-danger btn-sm">🗑</a>
+                                </div>
+                                {% endfor %}
+                            </td>
+
+                            <!-- Files -->
+                            <td>
+                                {% for f in task.files %}
+                                <div class="d-flex mb-1 align-items-center">
+                                    <a href="{{ url_for('uploaded_file', filename=f) }}" target="_blank"
+                                        class="btn btn-primary btn-sm me-2">📂 {{f}}</a>
+                                    <a href="{{ url_for('delete_file', task_id=task.id, filename=f) }}"
+                                        class="btn btn-danger btn-sm">🗑</a>
+                                </div>
+                                {% endfor %}
+                            </td>
+
+                            <td>{{task.created_at.strftime('%Y-%m-%d %H:%M')}}</td>
+                            <td>
+                                <a href="{{url_for('edit_task', task_id=task.id)}}"
+                                    class="btn btn-warning btn-sm mb-1">✏️ Edit</a>
+                                <a href="{{url_for('delete_task', task_id=task.id)}}" class="btn btn-danger btn-sm mb-1"
+                                    onclick="return confirm('Are you sure?')">🗑 Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="row">
+            <div class="col-md-4">
+                <canvas id="teamChart"></canvas>
+            </div>
+            <div class="col-md-4">
+                <canvas id="projectChart"></canvas>
+            </div>
+            <div class="col-md-4">
+                <canvas id="typeChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Add dynamic link input
+        $('#add-link-btn').click(function () {
+            $('#links-wrapper').append('<input type="text" name="links[]" class="form-control mb-2" placeholder="Add link">');
+        });
+
+        // Charts
+        const teamData = {
+            labels: [{% for t, count in tasks_per_team %}'{{t}}', {% endfor %}],
+        datasets: [{ label: 'Tasks per Team', data: [{% for t, count in tasks_per_team %}{{ count }}, {% endfor %}], backgroundColor: 'rgba(75, 192, 192, 0.6)'}]
+        };
+        const projectData = {
+            labels: [{% for p, count in tasks_per_project %}'{{p}}', {% endfor %}],
+        datasets: [{ label: 'Tasks per Project', data: [{% for p, count in tasks_per_project %}{{ count }}, {% endfor %}], backgroundColor: 'rgba(153, 102, 255, 0.6)'}]
+        };
+        const typeData = {
+            labels: [{% for t, count in tasks_per_type %}'{{t}}', {% endfor %}],
+        datasets: [{ label: 'Tasks per Type', data: [{% for t, count in tasks_per_type %}{{ count }}, {% endfor %}], backgroundColor: 'rgba(255, 159, 64, 0.6)'}]
+        };
+        new Chart(document.getElementById('teamChart'), { type: 'bar', data: teamData });
+        new Chart(document.getElementById('projectChart'), { type: 'bar', data: projectData });
+        new Chart(document.getElementById('typeChart'), { type: 'pie', data: typeData });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
